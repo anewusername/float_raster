@@ -8,6 +8,6 @@ setup(name='float_raster',
       author='Jan Petykiewicz',
       author_email='anewusername@gmail.com',
       url='https://mpxd.net/gogs/jan/float_raster',
-      packages=['float_raster'],
+      py_modules=['float_raster'],
      )
 
