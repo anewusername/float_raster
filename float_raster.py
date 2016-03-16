@@ -43,10 +43,10 @@ def raster(poly_xy: numpy.ndarray,
     min_bounds = floor(poly_xy.min(axis=1))
     max_bounds = ceil(poly_xy.max(axis=1))
 
-    keep_x = logical_and(numpy.greater_equal(grid_x, min_bounds[0]),
-                         numpy.less_equal(grid_x, max_bounds[0]))
-    keep_y = logical_and(numpy.greater_equal(grid_y, min_bounds[1]),
-                         numpy.less_equal(grid_y, max_bounds[1]))
+    keep_x = logical_and(grid_x >= min_bounds[0],
+                         grid_x <= max_bounds[0])
+    keep_y = logical_and(grid_y >= min_bounds[1],
+                         grid_y <= max_bounds[1])
 
     if not (keep_x.any() and keep_y.any()):  # polygon doesn't overlap grid
         return zeros(num_xy_px)
@@ -148,8 +148,8 @@ def raster(poly_xy: numpy.ndarray,
     #  (they correspond to outside pixels, but couldn't be removed until now
     #  because poly_xy stores points, not segments, and the edge points are needed
     #  when creating endpoint_avg)
-    non_edge = numpy.logical_and(numpy.less(endpoint_avg[:, 0], grid_x[-1]),
-                                 numpy.less(endpoint_avg[:, 1], grid_y[-1]))
+    non_edge = numpy.logical_and(endpoint_avg[:, 0] < grid_x[-1],
+                                 endpoint_avg[:, 1] < grid_y[-1])
 
     x_sub = numpy.digitize(endpoint_avg[non_edge, 0], grid_x) - 1
     y_sub = numpy.digitize(endpoint_avg[non_edge, 1], grid_y) - 1
