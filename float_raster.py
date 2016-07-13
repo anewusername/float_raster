@@ -8,6 +8,7 @@ See the documentation for raster(...) for details.
 import numpy
 from numpy import r_, c_, logical_and, diff, floor, ceil, ones, zeros, vstack, hstack,\
     full_like, newaxis
+from scipy import sparse
 
 __author__ = 'Jan Petykiewicz'
 
@@ -157,16 +158,8 @@ def raster(poly_xy: numpy.ndarray,
     cover = diff(poly[:, 1], axis=0)[non_edge] / diff(grid_y)[y_sub]
     area = (endpoint_avg[non_edge, 0] - grid_x[x_sub]) * cover / diff(grid_x)[x_sub]
 
-    hist_range = [[0, num_xy_px[0]], [0, num_xy_px[1]]]
-    poly_grid  = numpy.histogram2d(x_sub, y_sub, bins=num_xy_px, range=hist_range, weights=-area)[0]
-    cover_grid = numpy.histogram2d(x_sub, y_sub, bins=num_xy_px, range=hist_range, weights=cover)[0]
-
-    poly_grid += cover_grid.cumsum(axis=0)
-
-    # do other stuff for dealing with multiple polygons?
-
-    # # deal with the user inputting the vertices in the wrong order
-    # if poly_grid.sum() < 0:
-    #     poly_grid = -poly_grid
+    poly_grid = sparse.coo_matrix((-area, (x_sub, y_sub)), shape=num_xy_px).toarray()
+    cover_grid = sparse.coo_matrix((cover, (x_sub, y_sub)), shape=num_xy_px).toarray()
+    poly_grid = poly_grid + cover_grid.cumsum(axis=0)
 
     return poly_grid

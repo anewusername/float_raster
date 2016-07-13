@@ -3,13 +3,14 @@
 from setuptools import setup
 
 setup(name='float_raster',
-      version='0.1',
+      version='0.2',
       description='High-precision anti-aliasing polygon rasterizer',
       author='Jan Petykiewicz',
       author_email='anewusername@gmail.com',
       url='https://mpxd.net/gogs/jan/float_raster',
       py_modules=['float_raster'],
       install_requires=[
-            'numpy'
+            'numpy',
+            'scipy',
       ],
       )
