@@ -6,8 +6,7 @@ See the documentation for raster(...) for details.
 """
 
 import numpy
-from numpy import r_, c_, logical_and, diff, floor, ceil, ones, zeros, vstack, hstack,\
-    full_like, newaxis
+from numpy import logical_and, diff, floor, ceil, ones, zeros, hstack, full_like, newaxis
 from scipy import sparse
 
 __author__ = 'Jan Petykiewicz'
