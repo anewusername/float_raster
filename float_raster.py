@@ -134,9 +134,6 @@ def raster(poly_xy: numpy.ndarray,
 
     # If the shape fell completely outside our area, just return a blank grid
     if poly_xy_xy.size == 0:
-        # for matlab:
-        # rg = array.array('d', numpy.nditer(zeros(num_xy_px), order='F'))
-        # return rg
         return zeros(num_xy_px)
 
     # ## Calculate area, cover
