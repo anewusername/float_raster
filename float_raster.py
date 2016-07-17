@@ -155,8 +155,11 @@ def raster(poly_xy: numpy.ndarray,
     cover = diff(poly[:, 1], axis=0)[non_edge] / diff(grid_y)[y_sub]
     area = (endpoint_avg[non_edge, 0] - grid_x[x_sub]) * cover / diff(grid_x)[x_sub]
 
-    poly_grid = sparse.coo_matrix((-area, (x_sub, y_sub)), shape=num_xy_px).toarray()
-    cover_grid = sparse.coo_matrix((cover, (x_sub, y_sub)), shape=num_xy_px).toarray()
-    poly_grid = poly_grid + cover_grid.cumsum(axis=0)
+    # Use coo_matrix(...).toarray() to efficiently convert from (x, y, v) pairs to ndarrays.
+    #  We can use v = (-area + 1j * cover) followed with calls to numpy.real() and numpy.imag() to
+    #  improve performance (Otherwise we'd have to call coo_matrix() twice. It's really inefficient
+    #  because it involves lots of random memory access, unlike real() and imag()).
+    poly_grid = sparse.coo_matrix((-area + 1j * cover, (x_sub, y_sub)), shape=num_xy_px).toarray()
+    result_grid = numpy.real(poly_grid) + numpy.imag(poly_grid).cumsum(axis=0)
 
-    return poly_grid
+    return result_grid
