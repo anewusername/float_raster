@@ -57,19 +57,24 @@ def raster(poly_xy: numpy.ndarray,
 
     num_poly_vertices = poly_xy.shape[1]
 
-    # ## Calculate intersections
+    '''
+    Calculate intersections between polygon and grid line segments
+    '''
     xy1b = numpy.roll(poly_xy, -1, axis=1)
 
+    # Lists of initial/final coordinates for polygon segments
     xi1 = poly_xy[0, :, newaxis]
     yi1 = poly_xy[1, :, newaxis]
     xf1 = xy1b[0, :, newaxis]
     yf1 = xy1b[1, :, newaxis]
 
+    # Lists of initial/final coordinates for grid segments
     xi2 = hstack((full_like(x_seg_ys, min_bounds[0]), y_seg_xs))
     xf2 = hstack((full_like(x_seg_ys, max_bounds[0]), y_seg_xs))
     yi2 = hstack((x_seg_ys, full_like(y_seg_xs, min_bounds[0])))
     yf2 = hstack((x_seg_ys, full_like(y_seg_xs, max_bounds[1])))
 
+    # Perform calculation
     dxi = xi1 - xi2
     dyi = yi1 - yi2
     dx1 = xf1 - xi1
@@ -92,68 +97,80 @@ def raster(poly_xy: numpy.ndarray,
         int_b = logical_and.reduce((u_a >= 0, u_a <= 1, u_b >= 0, u_b <= 1))
 
         # Arrange output.
+        # int_adjacency_matrix[i, j] tells us if polygon segment i intersects with grid line j
+        # int_xy_matrix[i, j] tells us the x,y coordinates of the intersection in the form x+iy
+        # int_normalized_distance_1to2[i, j] tells us the fraction of the segment i
+        #   we have to traverse in order to reach the intersection
         int_adjacency_matrix = int_b
-        int_matrix_x = int_x * int_b
-        int_matrix_y = int_y * int_b
+        int_xy_matrix = (int_x + 1j * int_y) * int_b
         int_normalized_distance_1to2 = u_a
 
-    # ## Insert intersection points as vertices
-    # If new points fall outside the window, shrink them back onto it
-    int_matrix_x = int_matrix_x.clip(grid_x[0], grid_x[-1])
-    int_matrix_y = int_matrix_y.clip(grid_y[0], grid_y[-1])
+    # print('sparsity', int_adjacency_matrix.astype(int).sum() / int_adjacency_matrix.size)
 
-    # sort intersections based on distance from first vertex, to add in order
+    '''
+    Insert any polygon-grid intersections as new polygon vertices
+    '''
+    # Figure out how to sort each row of the intersection matrices
+    #  based on distance from (xi1, yi1) (the polygon segment's first point)
+    # This lets us insert them as new vertices in the proper order
     sortix = int_normalized_distance_1to2.argsort(axis=1)
     sortix_paired = (numpy.arange(num_poly_vertices)[:, newaxis], sortix)
     assert(int_normalized_distance_1to2.shape[0] == num_poly_vertices)
 
-    # Use sortix to sort adjacency matrix and the intersection (x, y) coordinates,
-    #  and vstack the original points on top of the top row
-    xs = vstack((poly_xy[0, :], int_matrix_x[sortix_paired].T))
-    ys = vstack((poly_xy[1, :], int_matrix_y[sortix_paired].T))
-    has_intersection = r_[ones((1, poly_xy.shape[1]), dtype=bool),
-                          int_adjacency_matrix[sortix_paired].T]
+    # If any new points fall outside the window, shrink them back onto it
+    xy_shrunken = (numpy.real(int_xy_matrix).clip(grid_x[0], grid_x[-1]) + 1j *
+                   numpy.imag(int_xy_matrix).clip(grid_y[0], grid_y[-1]))
 
-    # Now use has_intersection to index the intersection coordinates, thus creating a 2-column
-    #  array which holds the [[x, y], ...] for the polygon with added vertices at pixel-boundary
-    #  intersections
-    poly_xy_xy = c_[xs.T[has_intersection.T], ys.T[has_intersection.T]]
+    # Use sortix to sort adjacency matrix and the intersection (x, y) coordinates,
+    #  and hstack the original points to the left of the new ones
+    xy_with_original = hstack((poly_xy[0, :, newaxis] + 1j * poly_xy[1, :, newaxis],
+                               xy_shrunken[sortix_paired]))
+    has_intersection = hstack((ones((poly_xy.shape[1], 1), dtype=bool),
+                               int_adjacency_matrix[sortix_paired]))
+
+    # Now remove all extra entries which don't correspond to new vertices
+    #  (ie, no intersection happened), and then flatten, creating our
+    #  polygon-with-extra-vertices, though some extra vertices are included,
+    #  which we must remove manually.
+    vertices = xy_with_original[has_intersection]
 
     # Remove points outside the window (these will only be original points)
     #  Since the boundaries of the window are also pixel boundaries, this just
     #  makes the polygon boundary proceed along the window edge
-    inside_window = logical_and.reduce((poly_xy_xy[:, 1] <= grid_y[-1],
-                                        poly_xy_xy[:, 1] >= grid_y[0],
-                                        poly_xy_xy[:, 0] <= grid_x[-1],
-                                        poly_xy_xy[:, 0] >= grid_x[0]))
-    poly_xy_xy = poly_xy_xy[inside_window, :]
+    inside = logical_and.reduce((numpy.real(vertices) <= grid_x[-1],
+                                 numpy.real(vertices) >= grid_x[0],
+                                 numpy.imag(vertices) <= grid_y[-1],
+                                 numpy.imag(vertices) >= grid_y[0]))
+    vertices = vertices[inside]
 
-    # Remove consecutive duplicate entries
-    consecutive = diff(poly_xy_xy, axis=0).any(axis=1)  # use any() as !=0
-    poly_xy_xy = poly_xy_xy[r_[True, consecutive], :]
+    # Remove consecutive duplicate vertices
+    consecutive = numpy.ediff1d(vertices, to_begin=[1 + 1j]).astype(bool)
+    vertices = vertices[consecutive]
 
     # If the shape fell completely outside our area, just return a blank grid
-    if poly_xy_xy.size == 0:
+    if vertices.size == 0:
         return zeros(num_xy_px)
 
-    # ## Calculate area, cover
+    '''
+    Calculate area, cover
+    '''
     # Calculate segment cover, area, and corresponding pixel's subscripts
-    poly = vstack((poly_xy_xy,
-                   poly_xy_xy[0, :]))
-    endpoint_avg = (poly[:-1, :] + poly[1:, :]) / 2
+    poly = hstack((vertices, vertices[0]))
+    endpoint_avg = (poly[:-1] + poly[1:]) * 0.5
 
     # Remove segments along the right,top edges
     #  (they correspond to outside pixels, but couldn't be removed until now
     #  because poly_xy stores points, not segments, and the edge points are needed
     #  when creating endpoint_avg)
-    non_edge = numpy.logical_and(endpoint_avg[:, 0] < grid_x[-1],
-                                 endpoint_avg[:, 1] < grid_y[-1])
+    non_edge = numpy.logical_and(numpy.real(endpoint_avg) < grid_x[-1],
+                                 numpy.imag(endpoint_avg) < grid_y[-1])
 
-    x_sub = numpy.digitize(endpoint_avg[non_edge, 0], grid_x) - 1
-    y_sub = numpy.digitize(endpoint_avg[non_edge, 1], grid_y) - 1
+    endpoint_final = endpoint_avg[non_edge]
+    x_sub = numpy.digitize(numpy.real(endpoint_final), grid_x) - 1
+    y_sub = numpy.digitize(numpy.imag(endpoint_final), grid_y) - 1
 
-    cover = diff(poly[:, 1], axis=0)[non_edge] / diff(grid_y)[y_sub]
-    area = (endpoint_avg[non_edge, 0] - grid_x[x_sub]) * cover / diff(grid_x)[x_sub]
+    cover = diff(numpy.imag(poly), axis=0)[non_edge] / diff(grid_y)[y_sub]
+    area = (numpy.real(endpoint_final) - grid_x[x_sub]) * cover / diff(grid_x)[x_sub]
 
     # Use coo_matrix(...).toarray() to efficiently convert from (x, y, v) pairs to ndarrays.
     #  We can use v = (-area + 1j * cover) followed with calls to numpy.real() and numpy.imag() to
