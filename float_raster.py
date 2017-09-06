@@ -12,7 +12,7 @@ from scipy import sparse
 __author__ = 'Jan Petykiewicz'
 
 
-def raster(poly_xy: numpy.ndarray,
+def raster(vertices: numpy.ndarray,
            grid_x: numpy.ndarray,
            grid_y: numpy.ndarray
            ) -> numpy.ndarray:
@@ -23,25 +23,21 @@ def raster(poly_xy: numpy.ndarray,
      usually only allow for 256 (and often fewer) possible pixel values without performing (very
      slow) super-sampling.
 
-    :param poly_xy: 2xN ndarray containing x,y coordinates for each point in the polygon
+    Polygons are assumed to have clockwise vertex order; reversing the vertex order is equivalent
+     to multiplying the result by -1.
+
+    :param vertices: 2xN ndarray containing x,y coordinates for each vertex of the polygon
     :param grid_x: x-coordinates for the edges of each pixel (ie, the leftmost two columns span
         x=grid_x[0] to x=grid_x[1] and x=grid_x[1] to x=grid_x[2])
     :param grid_y: y-coordinates for the edges of each pixel (see grid_x)
     :return: 2D ndarray with pixel values in the range [0, 1] containing the anti-aliased polygon
     """
-    poly_xy = numpy.array(poly_xy)
+    vertices = numpy.array(vertices)
     grid_x = numpy.array(grid_x)
     grid_y = numpy.array(grid_y)
 
-    if poly_xy.shape[0] != 2:
-        raise Exception('poly_xy must be 2xN')
-    if grid_x.size < 1 or grid_y.size < 1:
-        raise Exception('Grid must contain at least one full pixel')
-
-    num_xy_px = numpy.array([grid_x.size, grid_y.size]) - 1
-
-    min_bounds = floor(poly_xy.min(axis=1))
-    max_bounds = ceil(poly_xy.max(axis=1))
+    min_bounds = floor(vertices.min(axis=1))
+    max_bounds = ceil(vertices.max(axis=1))
 
     keep_x = logical_and(grid_x >= min_bounds[0],
                          grid_x <= max_bounds[0])
@@ -49,21 +45,47 @@ def raster(poly_xy: numpy.ndarray,
                          grid_y <= max_bounds[1])
 
     if not (keep_x.any() and keep_y.any()):  # polygon doesn't overlap grid
-        return zeros(num_xy_px)
+        return zeros((grid_x.size - 1, grid_y.size - 1))
+
+    vertices = create_vertices(vertices, grid_x, grid_y)
+    parts_grid = get_raster_parts(vertices, grid_x, grid_y).toarray()
+    result_grid = numpy.real(parts_grid) + numpy.imag(parts_grid).cumsum(axis=0)
+    return result_grid
+
+
+def calculate_intersection_vertices(
+        vertices: numpy.ndarray,
+        grid_x: numpy.ndarray,
+        grid_y: numpy.ndarray
+        ):
+    """
+    """
+    if vertices.shape[0] != 2:
+        raise Exception('vertices must be 2xN')
+
+    min_bounds = floor(vertices.min(axis=1))
+    max_bounds = ceil(vertices.max(axis=1))
+
+    keep_x = logical_and(grid_x >= min_bounds[0],
+                         grid_x <= max_bounds[0])
+    keep_y = logical_and(grid_y >= min_bounds[1],
+                         grid_y <= max_bounds[1])
+
+    if not (keep_x.any() or keep_y.any()):  # polygon doesn't overlap grid
+        mat_shape = (vertices.shape[1], grid_x.size + grid_y.size)
+        return zeros(mat_shape), zeros(mat_shape), zeros(mat_shape, dtype=bool)
 
     y_seg_xs = hstack((min_bounds[0], grid_x[keep_x], max_bounds[0])).T
     x_seg_ys = hstack((min_bounds[1], grid_y[keep_y], max_bounds[1])).T
 
-    num_poly_vertices = poly_xy.shape[1]
-
     '''
     Calculate intersections between polygon and grid line segments
     '''
-    xy1b = numpy.roll(poly_xy, -1, axis=1)
+    xy1b = numpy.roll(vertices, -1, axis=1)
 
     # Lists of initial/final coordinates for polygon segments
-    xi1 = poly_xy[0, :, newaxis]
-    yi1 = poly_xy[1, :, newaxis]
+    xi1 = vertices[0, :, newaxis]
+    yi1 = vertices[1, :, newaxis]
     xf1 = xy1b[0, :, newaxis]
     yf1 = xy1b[1, :, newaxis]
 
@@ -105,6 +127,27 @@ def raster(poly_xy: numpy.ndarray,
         int_normalized_distance_1to2 = u_a
 
     # print('sparsity', int_adjacency_matrix.astype(int).sum() / int_adjacency_matrix.size)
+    return int_normalized_distance_1to2, int_xy_matrix, int_adjacency_matrix
+
+
+def create_vertices(
+        vertices: numpy.ndarray,
+        grid_x: numpy.ndarray,
+        grid_y: numpy.ndarray,
+        new_vertex_data=None
+        ) -> sparse.coo_matrix:
+    """
+    """
+    if vertices.shape[0] != 2:
+        raise Exception('vertices must be 2xN')
+    if grid_x.size < 1 or grid_y.size < 1:
+        raise Exception('Grid must contain at least one line in each direction?')
+
+    num_poly_vertices = vertices.shape[1]
+
+    if new_vertex_data is None:
+        new_vertex_data = calculate_intersection_vertices(vertices, grid_x, grid_y)
+    int_normalized_distance_1to2, int_xy_matrix, int_adjacency_matrix = new_vertex_data
 
     '''
     Insert any polygon-grid intersections as new polygon vertices
@@ -116,39 +159,104 @@ def raster(poly_xy: numpy.ndarray,
     sortix_paired = (numpy.arange(num_poly_vertices)[:, newaxis], sortix)
     assert(int_normalized_distance_1to2.shape[0] == num_poly_vertices)
 
-    # If any new points fall outside the window, shrink them back onto it
+    # if any new points fall outside the window, shrink them back onto it
     xy_shrunken = (numpy.real(int_xy_matrix).clip(grid_x[0], grid_x[-1]) + 1j *
                    numpy.imag(int_xy_matrix).clip(grid_y[0], grid_y[-1]))
 
     # Use sortix to sort adjacency matrix and the intersection (x, y) coordinates,
     #  and hstack the original points to the left of the new ones
-    xy_with_original = hstack((poly_xy[0, :, newaxis] + 1j * poly_xy[1, :, newaxis],
+    xy_with_original = hstack((vertices[0, :, newaxis] + 1j * vertices[1, :, newaxis],
                                xy_shrunken[sortix_paired]))
-    has_intersection = hstack((ones((poly_xy.shape[1], 1), dtype=bool),
+    has_intersection = hstack((ones((vertices.shape[1], 1), dtype=bool),
                                int_adjacency_matrix[sortix_paired]))
 
     # Now remove all extra entries which don't correspond to new vertices
     #  (ie, no intersection happened), and then flatten, creating our
-    #  polygon-with-extra-vertices, though some extra vertices are included,
-    #  which we must remove manually.
+    #  polygon-with-extra-vertices, though some redundant vertices are included,
+    #  which we must later remove manually.
     vertices = xy_with_original[has_intersection]
 
+    return vertices
+
+def clip_vertices_to_window(
+        vertices: numpy.ndarray,
+        min_x: float = -numpy.inf,
+        max_x: float = numpy.inf,
+        min_y: float = -numpy.inf,
+        max_y: float = numpy.inf
+        ) -> numpy.ndarray:
+    """
+    """
+#    xy_shrunken = (numpy.real(vertices).clip(min_x, max_x) + 1j *
+#                   numpy.imag(vertices).clip(max_y, min_y))
+#
+#    # forward_difference: 1 if either coordinate changed from the previous point
+#    forward_diff = (numpy.roll(xy_shrunken, 1) - xy_shrunken) != 0
+#    xys = xy_shrunken[forward_diff]
+#
+#    forward_diff = numpy.roll(xys, 1) - xys
+#    roll_diff = numpy.roll(forward_diff, -1)
+#    keep = numpy.logical_or(
+#                    numpy.logical_and(numpy.real(forward_diff),
+#                                      numpy.real(roll_diff)),
+#                    numpy.logical_and(numpy.imag(forward_diff),
+#                                      numpy.imag(roll_diff)))
+#    nondup = xys[keep]
+#    return nondup
     # Remove points outside the window (these will only be original points)
     #  Since the boundaries of the window are also pixel boundaries, this just
     #  makes the polygon boundary proceed along the window edge
-    inside = logical_and.reduce((numpy.real(vertices) <= grid_x[-1],
-                                 numpy.real(vertices) >= grid_x[0],
-                                 numpy.imag(vertices) <= grid_y[-1],
-                                 numpy.imag(vertices) >= grid_y[0]))
+    inside = logical_and.reduce((numpy.real(vertices) <= max_x,
+                                 numpy.real(vertices) >= min_x,
+                                 numpy.imag(vertices) <= max_y,
+                                 numpy.imag(vertices) >= min_y))
     vertices = vertices[inside]
 
     # Remove consecutive duplicate vertices
     consecutive = numpy.ediff1d(vertices, to_begin=[1 + 1j]).astype(bool)
     vertices = vertices[consecutive]
+    return vertices
+
+
+def get_raster_parts(
+        vertices: numpy.ndarray,
+        grid_x: numpy.ndarray,
+        grid_y: numpy.ndarray
+        ) -> sparse.coo_matrix:
+    """
+    This function performs the same task as raster(...), but instead of returning a dense array
+    of pixel values, it returns a sparse array containing the value
+        (-area + 1j * cover)
+    for each pixel which contains a line segment, where
+        cover   is the fraction of the pixel's y-length that is traversed by the segment,
+                 multiplied by the sign of (y_final - y_initial)
+        area    is the fraction of the pixel's area covered by the trapezoid formed by
+                 the line segment's endpoints (clipped to the cell edges) and their projections
+                 onto the pixel's left (i.e., lowest-x) edge, again multiplied by
+                 the sign of (y_final - y_initial)
+        Note that polygons are assumed to be wound clockwise.
+
+    The result from raster(...) can be obtained with
+        raster_result = numpy.real(lines_result) + numpy.imag(lines_result).cumsum(axis=0)
+
+    :param vertices: 2xN ndarray containing x,y coordinates for each point in the polygon
+    :param grid_x: x-coordinates for the edges of each pixel (ie, the leftmost two columns span
+        x=grid_x[0] to x=grid_x[1] and x=grid_x[1] to x=grid_x[2])
+    :param grid_y: y-coordinates for the edges of each pixel (see grid_x)
+    :return: Complex sparse COO matrix containing area and cover information
+    """
+    if grid_x.size < 2 or grid_y.size < 2:
+        raise Exception('Grid must contain at least one full pixel')
+
+    num_xy_px = numpy.array([grid_x.size, grid_y.size]) - 1
+
+    vertices = clip_vertices_to_window(vertices,
+                                       grid_x[0], grid_x[-1],
+                                       grid_y[0], grid_y[-1])
 
     # If the shape fell completely outside our area, just return a blank grid
     if vertices.size == 0:
-        return zeros(num_xy_px)
+        return sparse.coo_matrix(shape=num_xy_px)
 
     '''
     Calculate area, cover
@@ -159,23 +267,22 @@ def raster(poly_xy: numpy.ndarray,
 
     # Remove segments along the right,top edges
     #  (they correspond to outside pixels, but couldn't be removed until now
-    #  because poly_xy stores points, not segments, and the edge points are needed
+    #  because 'vertices' stored points, not segments, and the edge points are needed
     #  when creating endpoint_avg)
     non_edge = numpy.logical_and(numpy.real(endpoint_avg) < grid_x[-1],
                                  numpy.imag(endpoint_avg) < grid_y[-1])
 
-    endpoint_final = endpoint_avg[non_edge]
-    x_sub = numpy.digitize(numpy.real(endpoint_final), grid_x) - 1
-    y_sub = numpy.digitize(numpy.imag(endpoint_final), grid_y) - 1
+    endpoint_avg_final = endpoint_avg[non_edge]
+    x_sub = numpy.digitize(numpy.real(endpoint_avg_final), grid_x) - 1
+    y_sub = numpy.digitize(numpy.imag(endpoint_avg_final), grid_y) - 1
 
     cover = diff(numpy.imag(poly), axis=0)[non_edge] / diff(grid_y)[y_sub]
-    area = (numpy.real(endpoint_final) - grid_x[x_sub]) * cover / diff(grid_x)[x_sub]
+    area = (numpy.real(endpoint_avg_final) - grid_x[x_sub]) * cover / diff(grid_x)[x_sub]
 
     # Use coo_matrix(...).toarray() to efficiently convert from (x, y, v) pairs to ndarrays.
     #  We can use v = (-area + 1j * cover) followed with calls to numpy.real() and numpy.imag() to
     #  improve performance (Otherwise we'd have to call coo_matrix() twice. It's really inefficient
     #  because it involves lots of random memory access, unlike real() and imag()).
-    poly_grid = sparse.coo_matrix((-area + 1j * cover, (x_sub, y_sub)), shape=num_xy_px).toarray()
-    result_grid = numpy.real(poly_grid) + numpy.imag(poly_grid).cumsum(axis=0)
+    poly_grid = sparse.coo_matrix((-area + 1j * cover, (x_sub, y_sub)), shape=num_xy_px)
+    return poly_grid
 
-    return result_grid
