@@ -5,6 +5,7 @@ Module for rasterizing polygons, with float-precision anti-aliasing on
 See the documentation for raster(...) for details.
 """
 
+from typing import Tuple
 import numpy
 from numpy import logical_and, diff, floor, ceil, ones, zeros, hstack, full_like, newaxis
 from scipy import sparse
@@ -53,12 +54,13 @@ def raster(vertices: numpy.ndarray,
     return result_grid
 
 
-def calculate_intersection_vertices(
+def find_intersections(
         vertices: numpy.ndarray,
         grid_x: numpy.ndarray,
         grid_y: numpy.ndarray
-        ):
+        ) -> Tuple[numpy.ndarray]:
     """
+    Find intersections between a polygon and grid lines
     """
     if vertices.shape[0] != 2:
         raise Exception('vertices must be 2xN')
@@ -112,31 +114,31 @@ def calculate_intersection_vertices(
         u_a = numerator_a / denominator
         u_b = numerator_b / denominator
 
-        # Find the adjacency matrix A of intersecting lines.
+        # Find the adjacency matrix
         int_x = xi1 + dx1 * u_a
         int_y = yi1 + dy1 * u_a
-        int_b = logical_and.reduce((u_a >= 0, u_a <= 1, u_b >= 0, u_b <= 1))
+        adjacency = logical_and.reduce((u_a >= 0, u_a <= 1, u_b >= 0, u_b <= 1))
 
         # Arrange output.
-        # int_adjacency_matrix[i, j] tells us if polygon segment i intersects with grid line j
-        # int_xy_matrix[i, j] tells us the x,y coordinates of the intersection in the form x+iy
-        # int_normalized_distance_1to2[i, j] tells us the fraction of the segment i
+        # adjacency[i, j] tells us if polygon segment i intersects with grid line j
+        # xy[i, j] tells us the x,y coordinates of the intersection in the form x+iy
+        # normalized_distance[i, j] tells us the fraction of the segment i
         #   we have to traverse in order to reach the intersection
-        int_adjacency_matrix = int_b
-        int_xy_matrix = (int_x + 1j * int_y) * int_b
-        int_normalized_distance_1to2 = u_a
+        xy = (int_x + 1j * int_y) * adjacency
+        normalized_distance = u_a
 
-    # print('sparsity', int_adjacency_matrix.astype(int).sum() / int_adjacency_matrix.size)
-    return int_normalized_distance_1to2, int_xy_matrix, int_adjacency_matrix
+    # print('sparsity', adjacency.astype(int).sum() / adjacency.size)
+    return normalized_distance, xy, adjacency
 
 
 def create_vertices(
         vertices: numpy.ndarray,
         grid_x: numpy.ndarray,
         grid_y: numpy.ndarray,
-        new_vertex_data=None
+        new_vertex_data: Tuple[numpy.ndarray] = None
         ) -> sparse.coo_matrix:
     """
+    Create additional vertices where a polygon crosses gridlines
     """
     if vertices.shape[0] != 2:
         raise Exception('vertices must be 2xN')
@@ -146,8 +148,8 @@ def create_vertices(
     num_poly_vertices = vertices.shape[1]
 
     if new_vertex_data is None:
-        new_vertex_data = calculate_intersection_vertices(vertices, grid_x, grid_y)
-    int_normalized_distance_1to2, int_xy_matrix, int_adjacency_matrix = new_vertex_data
+        new_vertex_data = find_intersections(vertices, grid_x, grid_y)
+    normalized_distance, xy_matrix, adjacency_matrix = new_vertex_data
 
     '''
     Insert any polygon-grid intersections as new polygon vertices
@@ -155,20 +157,20 @@ def create_vertices(
     # Figure out how to sort each row of the intersection matrices
     #  based on distance from (xi1, yi1) (the polygon segment's first point)
     # This lets us insert them as new vertices in the proper order
-    sortix = int_normalized_distance_1to2.argsort(axis=1)
+    sortix = normalized_distance.argsort(axis=1)
     sortix_paired = (numpy.arange(num_poly_vertices)[:, newaxis], sortix)
-    assert(int_normalized_distance_1to2.shape[0] == num_poly_vertices)
+    assert(normalized_distance.shape[0] == num_poly_vertices)
 
     # if any new points fall outside the window, shrink them back onto it
-    xy_shrunken = (numpy.real(int_xy_matrix).clip(grid_x[0], grid_x[-1]) + 1j *
-                   numpy.imag(int_xy_matrix).clip(grid_y[0], grid_y[-1]))
+    xy_shrunken = (numpy.real(xy_matrix).clip(grid_x[0], grid_x[-1]) + 1j *
+                   numpy.imag(xy_matrix).clip(grid_y[0], grid_y[-1]))
 
     # Use sortix to sort adjacency matrix and the intersection (x, y) coordinates,
     #  and hstack the original points to the left of the new ones
     xy_with_original = hstack((vertices[0, :, newaxis] + 1j * vertices[1, :, newaxis],
                                xy_shrunken[sortix_paired]))
     has_intersection = hstack((ones((vertices.shape[1], 1), dtype=bool),
-                               int_adjacency_matrix[sortix_paired]))
+                               adjacency_matrix[sortix_paired]))
 
     # Now remove all extra entries which don't correspond to new vertices
     #  (ie, no intersection happened), and then flatten, creating our
@@ -187,22 +189,6 @@ def clip_vertices_to_window(
         ) -> numpy.ndarray:
     """
     """
-#    xy_shrunken = (numpy.real(vertices).clip(min_x, max_x) + 1j *
-#                   numpy.imag(vertices).clip(max_y, min_y))
-#
-#    # forward_difference: 1 if either coordinate changed from the previous point
-#    forward_diff = (numpy.roll(xy_shrunken, 1) - xy_shrunken) != 0
-#    xys = xy_shrunken[forward_diff]
-#
-#    forward_diff = numpy.roll(xys, 1) - xys
-#    roll_diff = numpy.roll(forward_diff, -1)
-#    keep = numpy.logical_or(
-#                    numpy.logical_and(numpy.real(forward_diff),
-#                                      numpy.real(roll_diff)),
-#                    numpy.logical_and(numpy.imag(forward_diff),
-#                                      numpy.imag(roll_diff)))
-#    nondup = xys[keep]
-#    return nondup
     # Remove points outside the window (these will only be original points)
     #  Since the boundaries of the window are also pixel boundaries, this just
     #  makes the polygon boundary proceed along the window edge
