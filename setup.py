@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name='float_raster',
-      version='0.3',
+      version='0.4',
       description='High-precision anti-aliasing polygon rasterizer',
       author='Jan Petykiewicz',
       author_email='anewusername@gmail.com',
