@@ -14,5 +14,5 @@ Requirements:
 
 Install with pip, via git:
 ```bash
-pip install git+https://mpxd.net/gogs/jan/float_raster.git@release
+pip install git+https://mpxd.net/code/jan/float_raster.git@release
 ```

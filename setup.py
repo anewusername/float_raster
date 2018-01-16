@@ -7,7 +7,7 @@ setup(name='float_raster',
       description='High-precision anti-aliasing polygon rasterizer',
       author='Jan Petykiewicz',
       author_email='anewusername@gmail.com',
-      url='https://mpxd.net/gogs/jan/float_raster',
+      url='https://mpxd.net/code/jan/float_raster',
       py_modules=['float_raster'],
       install_requires=[
             'numpy',
