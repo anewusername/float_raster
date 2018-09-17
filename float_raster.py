@@ -12,6 +12,8 @@ from scipy import sparse
 
 __author__ = 'Jan Petykiewicz'
 
+version = '0.4'
+
 
 def raster(vertices: numpy.ndarray,
            grid_x: numpy.ndarray,

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 from setuptools import setup
+import float_raster
 
 setup(name='float_raster',
-      version='0.4',
+      version=float_raster.version,
       description='High-precision anti-aliasing polygon rasterizer',
       author='Jan Petykiewicz',
       author_email='anewusername@gmail.com',
