@@ -13,7 +13,7 @@ setup(name='float_raster',
       long_description_content_type='text/markdown',
       author='Jan Petykiewicz',
       author_email='anewusername@gmail.com',
-      url='https://mpxd.net/gogs/jan/float_raster',
+      url='https://mpxd.net/code/jan/float_raster',
       py_modules=['float_raster'],
       install_requires=[
             'numpy',
