@@ -1,18 +1,7 @@
-"""
-Module for rasterizing polygons, with float-precision anti-aliasing on
- a non-uniform rectangular grid.
-
-See the documentation for raster(...) for details.
-"""
-
 from typing import Tuple
 import numpy
 from numpy import logical_and, diff, floor, ceil, ones, zeros, hstack, full_like, newaxis
 from scipy import sparse
-
-__author__ = 'Jan Petykiewicz'
-
-version = '0.4'
 
 
 def raster(vertices: numpy.ndarray,

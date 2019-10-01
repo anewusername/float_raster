@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 
-from setuptools import setup
-import float_raster
+from setuptools import setup, find_packages
 
 with open('README.md', 'r') as f:
     long_description = f.read()
 
+with open('float_raster/VERSION', 'r') as f:
+    version = f.read().strip()
+
 setup(name='float_raster',
-      version=float_raster.version,
+      version=version,
       description='High-precision anti-aliasing polygon rasterizer',
       long_description=long_description,
       long_description_content_type='text/markdown',
       author='Jan Petykiewicz',
       author_email='anewusername@gmail.com',
       url='https://mpxd.net/code/jan/float_raster',
-      py_modules=['float_raster'],
+      packages=find_packages(),
+      package_data={
+          'float_raster': ['VERSION']
+      },
       install_requires=[
             'numpy',
             'scipy',
