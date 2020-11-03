@@ -18,7 +18,9 @@ setup(name='float_raster',
       url='https://mpxd.net/code/jan/float_raster',
       packages=find_packages(),
       package_data={
-          'float_raster': ['VERSION']
+          'float_raster': ['VERSION',
+                           'py.typed',
+                           ]
       },
       install_requires=[
             'numpy',
