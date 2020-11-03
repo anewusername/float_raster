@@ -13,7 +13,7 @@ with variable pixel widths and heights.
 ## Installation
 
 Requirements:
-* python 3 (written and tested with 3.5)
+* python >=3.8
 * numpy
 
 Install with pip:
