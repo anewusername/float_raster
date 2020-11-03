@@ -5,12 +5,7 @@ Module for rasterizing polygons, with float-precision anti-aliasing on
 See the documentation for float_raster.raster(...) for details.
 """
 
-import pathlib
-
+from .VERSION import __version__
 from .float_raster import *
 
 __author__ = 'Jan Petykiewicz'
-
-with open(pathlib.Path(__file__).parent / 'VERSION', 'r') as f:
-    __version__ = f.read().strip()
-

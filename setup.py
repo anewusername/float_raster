@@ -2,11 +2,12 @@
 
 from setuptools import setup, find_packages
 
+
 with open('README.md', 'r') as f:
     long_description = f.read()
 
-with open('float_raster/VERSION', 'r') as f:
-    version = f.read().strip()
+with open('float_raster/VERSION.py', 'rt') as f:
+    version = f.readlines()[2].strip()
 
 setup(name='float_raster',
       version=version,
@@ -18,9 +19,7 @@ setup(name='float_raster',
       url='https://mpxd.net/code/jan/float_raster',
       packages=find_packages(),
       package_data={
-          'float_raster': ['VERSION',
-                           'py.typed',
-                           ]
+          'float_raster': ['py.typed']
       },
       install_requires=[
             'numpy',
