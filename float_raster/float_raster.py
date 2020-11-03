@@ -1,7 +1,7 @@
-from typing import Tuple
-import numpy
+from typing import Tuple, Optional
+import numpy                # type: ignore
 from numpy import logical_and, diff, floor, ceil, ones, zeros, hstack, full_like, newaxis
-from scipy import sparse
+from scipy import sparse    # type: ignore
 
 
 def raster(vertices: numpy.ndarray,
@@ -18,11 +18,14 @@ def raster(vertices: numpy.ndarray,
     Polygons are assumed to have clockwise vertex order; reversing the vertex order is equivalent
      to multiplying the result by -1.
 
-    :param vertices: 2xN ndarray containing x,y coordinates for each vertex of the polygon
-    :param grid_x: x-coordinates for the edges of each pixel (ie, the leftmost two columns span
-        x=grid_x[0] to x=grid_x[1] and x=grid_x[1] to x=grid_x[2])
-    :param grid_y: y-coordinates for the edges of each pixel (see grid_x)
-    :return: 2D ndarray with pixel values in the range [0, 1] containing the anti-aliased polygon
+    Args:
+        vertices: 2xN ndarray containing `x,y` coordinates for each vertex of the polygon
+        grid_x: x-coordinates for the edges of each pixel (ie, the leftmost two columns span
+                `x=grid_x[0]` to `x=grid_x[1]` and `x=grid_x[1]` to `x=grid_x[2]`)
+        grid_y: y-coordinates for the edges of each pixel (see `grid_x`)
+
+    Returns:
+        2D ndarray with pixel values in the range [0, 1] containing the anti-aliased polygon
     """
     vertices = numpy.array(vertices)
     grid_x = numpy.array(grid_x)
@@ -49,7 +52,7 @@ def find_intersections(
         vertices: numpy.ndarray,
         grid_x: numpy.ndarray,
         grid_y: numpy.ndarray
-        ) -> Tuple[numpy.ndarray]:
+        ) -> Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
     """
     Find intersections between a polygon and grid lines
     """
@@ -126,7 +129,7 @@ def create_vertices(
         vertices: numpy.ndarray,
         grid_x: numpy.ndarray,
         grid_y: numpy.ndarray,
-        new_vertex_data: Tuple[numpy.ndarray] = None
+        new_vertex_data: Optional[Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]] = None
         ) -> sparse.coo_matrix:
     """
     Create additional vertices where a polygon crosses gridlines
@@ -171,6 +174,7 @@ def create_vertices(
 
     return vertices
 
+
 def clip_vertices_to_window(
         vertices: numpy.ndarray,
         min_x: float = -numpy.inf,
@@ -201,26 +205,29 @@ def get_raster_parts(
         grid_y: numpy.ndarray
         ) -> sparse.coo_matrix:
     """
-    This function performs the same task as raster(...), but instead of returning a dense array
+    This function performs the same task as `raster(...)`, but instead of returning a dense array
     of pixel values, it returns a sparse array containing the value
-        (-area + 1j * cover)
+        `(-area + 1j * cover)`
     for each pixel which contains a line segment, where
-        cover   is the fraction of the pixel's y-length that is traversed by the segment,
-                 multiplied by the sign of (y_final - y_initial)
-        area    is the fraction of the pixel's area covered by the trapezoid formed by
-                 the line segment's endpoints (clipped to the cell edges) and their projections
-                 onto the pixel's left (i.e., lowest-x) edge, again multiplied by
-                 the sign of (y_final - y_initial)
+        `cover`   is the fraction of the pixel's y-length that is traversed by the segment,
+                   multiplied by the sign of `(y_final - y_initial)`
+        `area`    is the fraction of the pixel's area covered by the trapezoid formed by
+                   the line segment's endpoints (clipped to the cell edges) and their projections
+                   onto the pixel's left (i.e., lowest-x) edge, again multiplied by
+                  the sign of `(y_final - y_initial)`
         Note that polygons are assumed to be wound clockwise.
 
-    The result from raster(...) can be obtained with
-        raster_result = numpy.real(lines_result) + numpy.imag(lines_result).cumsum(axis=0)
+    The result from `raster(...)` can be obtained with
+        `raster_result = numpy.real(lines_result) + numpy.imag(lines_result).cumsum(axis=0)`
 
-    :param vertices: 2xN ndarray containing x,y coordinates for each point in the polygon
-    :param grid_x: x-coordinates for the edges of each pixel (ie, the leftmost two columns span
-        x=grid_x[0] to x=grid_x[1] and x=grid_x[1] to x=grid_x[2])
-    :param grid_y: y-coordinates for the edges of each pixel (see grid_x)
-    :return: Complex sparse COO matrix containing area and cover information
+    Args:
+        vertices: 2xN ndarray containing `x, y` coordinates for each point in the polygon
+        grid_x: x-coordinates for the edges of each pixel (ie, the leftmost two columns span
+                `x=grid_x[0]` to `x=grid_x[1]` and `x=grid_x[1]` to `x=grid_x[2]`)
+        grid_y: y-coordinates for the edges of each pixel (see `grid_x`)
+
+    Returns:
+        Complex sparse COO matrix containing area and cover information
     """
     if grid_x.size < 2 or grid_y.size < 2:
         raise Exception('Grid must contain at least one full pixel')
