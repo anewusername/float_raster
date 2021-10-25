@@ -35,7 +35,6 @@ setup(name='float_raster',
             'License :: OSI Approved :: GNU Affero General Public License v3',
             'Topic :: Scientific/Engineering',
             'Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)',
-            'Topic :: Software Development :: Libraries :: Python Modules',
             'Topic :: Multimedia :: Graphics :: Graphics Conversion',
       ],
       )
