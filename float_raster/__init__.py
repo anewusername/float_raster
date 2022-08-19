@@ -8,4 +8,4 @@ See the documentation for float_raster.raster(...) for details.
 from .float_raster import *
 
 __author__ = 'Jan Petykiewicz'
-__version__ = '0.6'
+__version__ = '0.7'
