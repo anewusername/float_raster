@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "float_raster"
+description = "High-precision anti-aliasing polygon rasterizer"
+readme = "README.md"
+license = { file = "LICENSE.md" }
+authors = [
+    { name="Jan Petykiewicz", email="jan@mpxd.net" },
+    ]
+homepage = "https://mpxd.net/code/jan/float_raster"
+repository = "https://mpxd.net/code/jan/float_raster"
+keywords = [
+    "coverage",
+    ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Manufacturing",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+    ]
+requires-python = ">=3.8"
+dynamic = ["version"]
+dependencies = [
+    "numpy~=1.21",
+    "scipy",
+    ]
+
+[tool.hatch.version]
+path = "float_raster/__init__.py"
