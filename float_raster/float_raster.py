@@ -1,13 +1,14 @@
-from typing import Tuple, Optional
-import numpy                # type: ignore
+from numpy.typing import ArrayLike, NDArray
+import numpy
 from numpy import logical_and, diff, floor, ceil, ones, zeros, hstack, full_like, newaxis
-from scipy import sparse    # type: ignore
+from scipy import sparse
 
 
-def raster(vertices: numpy.ndarray,
-           grid_x: numpy.ndarray,
-           grid_y: numpy.ndarray
-           ) -> numpy.ndarray:
+def raster(
+        vertices: ArrayLike,
+        grid_x: ArrayLike,
+        grid_y: ArrayLike,
+        ) -> NDArray[numpy.float64]:
     """
     Draws a polygon onto a 2D grid of pixels, setting pixel values equal to the fraction of the
      pixel area covered by the polygon. This implementation is written for accuracy and works with
@@ -49,10 +50,10 @@ def raster(vertices: numpy.ndarray,
 
 
 def find_intersections(
-        vertices: numpy.ndarray,
-        grid_x: numpy.ndarray,
-        grid_y: numpy.ndarray
-        ) -> Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]:
+        vertices: NDArray[numpy.float_],
+        grid_x: NDArray[numpy.float_],
+        grid_y: NDArray[numpy.float_],
+        ) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64], NDArray[numpy.float64]]:
     """
     Find intersections between a polygon and grid lines
     """
@@ -126,10 +127,10 @@ def find_intersections(
 
 
 def create_vertices(
-        vertices: numpy.ndarray,
-        grid_x: numpy.ndarray,
-        grid_y: numpy.ndarray,
-        new_vertex_data: Optional[Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]] = None
+        vertices: NDArray[numpy.float_],
+        grid_x: NDArray[numpy.float_],
+        grid_y: NDArray[numpy.float_],
+        new_vertex_data: tuple[NDArray[numpy.float64], NDArray[numpy.float64], NDArray[numpy.float64]] | None = None
         ) -> sparse.coo_matrix:
     """
     Create additional vertices where a polygon crosses gridlines
@@ -176,12 +177,12 @@ def create_vertices(
 
 
 def clip_vertices_to_window(
-        vertices: numpy.ndarray,
+        vertices: NDArray[numpy.float64],
         min_x: float = -numpy.inf,
         max_x: float = numpy.inf,
         min_y: float = -numpy.inf,
         max_y: float = numpy.inf
-        ) -> numpy.ndarray:
+        ) -> NDArray[numpy.float64]:
     """
     """
     # Remove points outside the window (these will only be original points)
@@ -200,9 +201,9 @@ def clip_vertices_to_window(
 
 
 def get_raster_parts(
-        vertices: numpy.ndarray,
-        grid_x: numpy.ndarray,
-        grid_y: numpy.ndarray
+        vertices: ArrayLike,
+        grid_x: ArrayLike,
+        grid_y: ArrayLike,
         ) -> sparse.coo_matrix:
     """
     This function performs the same task as `raster(...)`, but instead of returning a dense array
@@ -229,14 +230,20 @@ def get_raster_parts(
     Returns:
         Complex sparse COO matrix containing area and cover information
     """
+    vertices = numpy.array(vertices)
+    grid_x = numpy.array(grid_x)
+    grid_y = numpy.array(grid_y)
+
     if grid_x.size < 2 or grid_y.size < 2:
         raise Exception('Grid must contain at least one full pixel')
 
     num_xy_px = numpy.array([grid_x.size, grid_y.size]) - 1
 
-    vertices = clip_vertices_to_window(vertices,
-                                       grid_x[0], grid_x[-1],
-                                       grid_y[0], grid_y[-1])
+    vertices = clip_vertices_to_window(
+        vertices,
+        grid_x[0], grid_x[-1],
+        grid_y[0], grid_y[-1],
+        )
 
     # If the shape fell completely outside our area, just return a blank grid
     if vertices.size == 0:
