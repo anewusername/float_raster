@@ -50,9 +50,9 @@ def raster(
 
 
 def find_intersections(
-        vertices: NDArray[numpy.float_],
-        grid_x: NDArray[numpy.float_],
-        grid_y: NDArray[numpy.float_],
+        vertices: NDArray[numpy.floating],
+        grid_x: NDArray[numpy.floating],
+        grid_y: NDArray[numpy.floating],
         ) -> tuple[NDArray[numpy.float64], NDArray[numpy.float64], NDArray[numpy.float64]]:
     """
     Find intersections between a polygon and grid lines
@@ -127,9 +127,9 @@ def find_intersections(
 
 
 def create_vertices(
-        vertices: NDArray[numpy.float_],
-        grid_x: NDArray[numpy.float_],
-        grid_y: NDArray[numpy.float_],
+        vertices: NDArray[numpy.floating],
+        grid_x: NDArray[numpy.floating],
+        grid_y: NDArray[numpy.floating],
         new_vertex_data: tuple[NDArray[numpy.float64], NDArray[numpy.float64], NDArray[numpy.float64]] | None = None
         ) -> sparse.coo_matrix:
     """
