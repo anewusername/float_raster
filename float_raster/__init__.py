@@ -15,4 +15,4 @@ from .float_raster import (
 
 
 __author__ = 'Jan Petykiewicz'
-__version__ = '0.7'
+__version__ = '0.8'
