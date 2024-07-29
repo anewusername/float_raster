@@ -30,11 +30,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
     "Topic :: Multimedia :: Graphics :: Graphics Conversion",
     ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 dynamic = ["version"]
 dependencies = [
-    "numpy~=1.26",
-    "scipy",
+    "numpy>=1.26",
+    "scipy~=1.14",
     ]
 
 [tool.hatch.version]
