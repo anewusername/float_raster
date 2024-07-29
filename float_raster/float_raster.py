@@ -4,6 +4,11 @@ from numpy import logical_and, diff, floor, ceil, ones, zeros, hstack, full_like
 from scipy import sparse
 
 
+class FloatRasterError(Exception):
+    """ Custom exception for float_raster """
+    pass
+
+
 def raster(
         vertices: ArrayLike,
         grid_x: ArrayLike,
@@ -58,7 +63,7 @@ def find_intersections(
     Find intersections between a polygon and grid lines
     """
     if vertices.shape[0] != 2:
-        raise Exception('vertices must be 2xN')
+        raise FloatRasterError('vertices must be 2xN')
 
     min_bounds = floor(vertices.min(axis=1))
     max_bounds = ceil(vertices.max(axis=1))
@@ -136,9 +141,9 @@ def create_vertices(
     Create additional vertices where a polygon crosses gridlines
     """
     if vertices.shape[0] != 2:
-        raise Exception('vertices must be 2xN')
+        raise FloatRasterError('vertices must be 2xN')
     if grid_x.size < 1 or grid_y.size < 1:
-        raise Exception('Grid must contain at least one line in each direction?')
+        raise FloatRasterError('Grid must contain at least one line in each direction?')
 
     num_poly_vertices = vertices.shape[1]
 
@@ -235,7 +240,7 @@ def get_raster_parts(
     grid_y = numpy.array(grid_y)
 
     if grid_x.size < 2 or grid_y.size < 2:
-        raise Exception('Grid must contain at least one full pixel')
+        raise FloatRasterError('Grid must contain at least one full pixel')
 
     num_xy_px = numpy.array([grid_x.size, grid_y.size]) - 1
 
